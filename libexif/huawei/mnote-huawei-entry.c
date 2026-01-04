@@ -120,7 +120,16 @@ format_exif_components(MnoteHuaweiEntry *e, char *v, unsigned int maxlen, unsign
 			}
 			returnSize = snprintf_s(v + write_pos, maxlen - write_pos,
 				maxlen - write_pos, "%hu ", data);
-        } else {
+        } else if (e->format == EXIF_FORMAT_RATIONAL) {
+			ExifRational r = exif_get_rational(e->data + i * sizeof(ExifRational), e->order);
+			if (r.denominator != 0) {
+				returnSize = snprintf_s(v + write_pos, maxlen - write_pos,
+				    maxlen - write_pos, "%f ", (double) r.numerator / (double) r.denominator);
+			} else {
+				returnSize = snprintf_s(v + write_pos, maxlen - write_pos,
+				    maxlen - write_pos, "%u ", r.numerator);
+			}
+		} else {
             snprintf_s(v, maxlen, maxlen, _("unsupported data types: %d"), e->format);
             return NULL;
         }
@@ -639,7 +648,9 @@ static const HuaweiTagInitInfo huawei_tag_init_table[] = {
     { MNOTE_HUAWEI_STARS_INFO, EXIF_FORMAT_SLONG, 1, NULL, 0 },
 	{ MNOTE_HUAWEI_XTSTYLE_ALGO_VERSION, EXIF_FORMAT_LONG, 1, NULL, 0 },
 	{ MNOTE_HUAWEI_XTSTYLE_ALGO_VIDEO_ENABLE, EXIF_FORMAT_BYTE, 1, NULL, 0 },
-	{ MNOTE_HUAWEI_ANNOTATION_EDIT, EXIF_FORMAT_LONG, 1, NULL, 0 }
+	{ MNOTE_HUAWEI_ANNOTATION_EDIT, EXIF_FORMAT_LONG, 1, NULL, 0 },
+	{MNOTE_HUAWEI_XTSTYLE_VIGNETTING, EXIF_FORMAT_RATIONAL, 1, NULL, 0 },
+	{MNOTE_HUAWEI_XTSTYLE_NOISE, EXIF_FORMAT_RATIONAL, 1, NULL, 0 }
 };
 
 void mnote_huawei_entry_initialize(MnoteHuaweiEntry *e, MnoteHuaweiTag tag, ExifByteOrder order)

@@ -37,6 +37,9 @@
 #define TIMESTAMP_LENGTH 10
 #define THREE_COMPONENTS 3
 #define SHORT_INCREMENT 2
+#define SHIFT_ONE_BYTE 8
+#define SHIFT_TWO_BYTE 16
+#define SHIFT_THREE_BYTE 24
 
 /* Get length of number for value in unsigned integer */
 uint32_t get_unsigned_int_length(uint32_t value)
@@ -64,6 +67,65 @@ uint32_t get_unsigned_char_length(uint32_t value) {
         return 1;
     }
     return (uint32_t)log10(value) + 1;
+}
+
+float exif_get_float (const unsigned char *buf, ExifByteOrder order)
+{
+    if (!buf) {
+		return 0.0f;
+	}
+
+    uint32_t u = 0;
+
+    switch (order) {
+    case EXIF_BYTE_ORDER_MOTOROLA: /* big-endian */
+        u = ((uint32_t)buf[0] << SHIFT_THREE_BYTE) |
+            ((uint32_t)buf[1] << SHIFT_TWO_BYTE) |
+            ((uint32_t)buf[2] <<  SHIFT_ONE_BYTE) |
+            ((uint32_t)buf[3]      );
+        break;
+    case EXIF_BYTE_ORDER_INTEL:    /* little-endian */
+        u = ((uint32_t)buf[3] << SHIFT_THREE_BYTE) |
+            ((uint32_t)buf[2] << SHIFT_TWO_BYTE) |
+            ((uint32_t)buf[1] <<  SHIFT_ONE_BYTE) |
+            ((uint32_t)buf[0]      );
+        break;
+    default:
+        return 0.0f;
+    }
+
+    float f = 0.0f;
+    if (memcpy_s(&f, sizeof(f), &u, sizeof(u)) != 0) {
+        return 0.0f;
+    }
+    return f;
+}
+
+void exif_set_float (unsigned char *buf, ExifByteOrder order, float value)
+{
+    if (!buf) return;
+
+    uint32_t u = 0;
+    if (memcpy_s(&u, sizeof(u), &value, sizeof(value)) != 0) {
+        return; // 拷贝失败就不写 buf
+    }
+
+    switch (order) {
+    case EXIF_BYTE_ORDER_MOTOROLA: /* big-endian */
+        buf[0] = (unsigned char)((u >> SHIFT_THREE_BYTE) & 0xFF);
+        buf[1] = (unsigned char)((u >> SHIFT_TWO_BYTE) & 0xFF);
+        buf[2] = (unsigned char)((u >>  SHIFT_ONE_BYTE) & 0xFF);
+        buf[3] = (unsigned char)( u        & 0xFF);
+        break;
+    case EXIF_BYTE_ORDER_INTEL:    /* little-endian */
+        buf[0] = (unsigned char)( u        & 0xFF);
+        buf[1] = (unsigned char)((u >>  SHIFT_ONE_BYTE) & 0xFF);
+        buf[2] = (unsigned char)((u >> SHIFT_TWO_BYTE) & 0xFF);
+        buf[3] = (unsigned char)((u >> SHIFT_THREE_BYTE) & 0xFF);
+        break;
+    default:
+        break;
+    }
 }
 
 /* Get components from exif */
@@ -129,6 +191,10 @@ format_exif_components(MnoteHuaweiEntry *e, char *v, unsigned int maxlen, unsign
 				returnSize = snprintf_s(v + write_pos, maxlen - write_pos,
 				    maxlen - write_pos, "%u ", r.numerator);
 			}
+		} else if (e->format == EXIF_FORMAT_FLOAT) {
+			float f = exif_get_float(e->data + i * sizeof(float), e->order);
+			returnSize = snprintf_s(v + write_pos, maxlen - write_pos,
+			        maxlen - write_pos, "%f ", (double)f);
 		} else {
             snprintf_s(v, maxlen, maxlen, _("unsupported data types: %d"), e->format);
             return NULL;
@@ -461,6 +527,46 @@ FINISH:
 }
 
 int
+mnote_huawei_entry_float_value_process(char *buff, const int buff_size, const char *v, int strlen,
+                                    const int increment, int *components, ExifMem *mem, ExifByteOrder order)
+{
+	char *token = NULL, *pv = NULL;
+	int components_local = 0, components_size = 0, ret = 0;
+
+	pv = exif_mem_alloc(mem, strlen + 1);
+	if(!pv) {
+		ret = -1;
+		goto FINISH;
+	}
+
+	*(pv + strlen) = 0;
+	if (EOK != memcpy_s(pv, strlen + 1, v, strlen)) {
+		ret = -1;
+		goto FINISH;
+	}
+
+	token = strtok(pv, " ");
+	for (; token && components_size < buff_size;) {
+		float value = atof(token);
+		int offset = increment * components_local;
+		exif_set_float((unsigned char*)(buff + offset), order, value);
+		components_local++;
+		components_size = components_local * increment;
+		token = strtok(NULL, " ");
+	}
+
+FINISH:
+    *components = components_local;
+	if(!components_local) {
+		ret = -1;
+	}
+	if (pv) {
+		exif_mem_free(mem, pv);
+	}
+	return ret;
+}
+
+int
 mnote_huawei_entry_set_value(MnoteHuaweiEntry *e, const char *v, int strlen)
 {
 	char data[DATA_LENGTH] = {0};
@@ -476,7 +582,7 @@ mnote_huawei_entry_set_value(MnoteHuaweiEntry *e, const char *v, int strlen)
 		increment = 1;
 	} else if (e->format == EXIF_FORMAT_SHORT || e->format == EXIF_FORMAT_SSHORT) {
 		increment = SHORT_INCREMENT;
-	} else if (e->format == EXIF_FORMAT_SLONG || e->format == EXIF_FORMAT_LONG) {
+	} else if (e->format == EXIF_FORMAT_SLONG || e->format == EXIF_FORMAT_LONG || e->format == EXIF_FORMAT_FLOAT) {
 		increment = 4;
 	} else if (e->format == EXIF_FORMAT_RATIONAL || e->format == EXIF_FORMAT_SRATIONAL) {
 		increment = 8;
@@ -493,6 +599,9 @@ mnote_huawei_entry_set_value(MnoteHuaweiEntry *e, const char *v, int strlen)
 	} else if (e->format == EXIF_FORMAT_RATIONAL) {
 		ret = mnote_huawei_entry_rational_process(data, sizeof(data), v, strlen,
 															&components, e->mem, e->order);
+	} else if (e->format == EXIF_FORMAT_FLOAT) {
+		ret = mnote_huawei_entry_float_value_process(data, sizeof(data), v, strlen, increment,
+	                                            &components, e->mem, e->order);
 	} else {
 		ret = mnote_huawei_entry_value_process(data, sizeof(data), v, strlen, increment,
 											   &components, e->mem, e->order);
@@ -640,17 +749,22 @@ static const HuaweiTagInitInfo huawei_tag_init_table[] = {
     { MNOTE_HUAWEI_FACE_LEYE_CENTER, EXIF_FORMAT_UNDEFINED, 1, NULL, 0 },
     { MNOTE_HUAWEI_FACE_REYE_CENTER, EXIF_FORMAT_UNDEFINED, 1, NULL, 0 },
     { MNOTE_HUAWEI_FACE_MOUTH_CENTER, EXIF_FORMAT_UNDEFINED, 1, NULL, 0 },
-	{ MNOTE_HUAWEI_XTSTYLE_TEMPLATE_NAME, EXIF_FORMAT_SSHORT, 1, NULL, 0 },
+    { MNOTE_HUAWEI_XTSTYLE_TEMPLATE_NAME, EXIF_FORMAT_SSHORT, 1, NULL, 0 },
     { MNOTE_HUAWEI_XTSTYLE_CUSTOM_LIGHT_SHADOW, EXIF_FORMAT_RATIONAL, 1, NULL, 1 },
     { MNOTE_HUAWEI_XTSTYLE_CUSTOM_SATURATION, EXIF_FORMAT_RATIONAL, 1, NULL, 1 },
     { MNOTE_HUAWEI_XTSTYLE_CUSTOM_HUE, EXIF_FORMAT_RATIONAL, 1, NULL, 1 },
     { MNOTE_HUAWEI_XTSTYLE_EXPOSUREPARAM_PARAM, EXIF_FORMAT_SSHORT, THREE_COMPONENTS, NULL, 0 },
     { MNOTE_HUAWEI_STARS_INFO, EXIF_FORMAT_SLONG, 1, NULL, 0 },
-	{ MNOTE_HUAWEI_XTSTYLE_ALGO_VERSION, EXIF_FORMAT_LONG, 1, NULL, 0 },
-	{ MNOTE_HUAWEI_XTSTYLE_ALGO_VIDEO_ENABLE, EXIF_FORMAT_BYTE, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_XMAGE_COLOR_MODE, EXIF_FORMAT_BYTE, 1, NULL, 0 },
+    { MNOTE_HUAWEI_XTSTYLE_ALGO_VERSION, EXIF_FORMAT_LONG, 1, NULL, 0 },
+    { MNOTE_HUAWEI_XTSTYLE_ALGO_VIDEO_ENABLE, EXIF_FORMAT_BYTE, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_IS_SUPPORT_EDIT_APERTURE, EXIF_FORMAT_LONG, 1, NULL, 0 },
 	{ MNOTE_HUAWEI_ANNOTATION_EDIT, EXIF_FORMAT_LONG, 1, NULL, 0 },
-	{MNOTE_HUAWEI_XTSTYLE_VIGNETTING, EXIF_FORMAT_RATIONAL, 1, NULL, 0 },
-	{MNOTE_HUAWEI_XTSTYLE_NOISE, EXIF_FORMAT_RATIONAL, 1, NULL, 0 }
+	{ MNOTE_HUAWEI_XTSTYLE_VIGNETTING, EXIF_FORMAT_RATIONAL, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_XTSTYLE_NOISE, EXIF_FORMAT_RATIONAL, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_ORIENTATION_ROLL, EXIF_FORMAT_FLOAT, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_ORIENTATION_PITCH, EXIF_FORMAT_FLOAT, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_ORIENTATION_YAW, EXIF_FORMAT_FLOAT, 1, NULL, 0 }
 };
 
 void mnote_huawei_entry_initialize(MnoteHuaweiEntry *e, MnoteHuaweiTag tag, ExifByteOrder order)

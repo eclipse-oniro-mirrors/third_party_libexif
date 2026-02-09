@@ -78,6 +78,8 @@ extern "C" {
 
 char *mnote_huawei_entry_get_value (MnoteHuaweiEntry *entry, char *v, unsigned int maxlen);
 int mnote_huawei_entry_set_value(MnoteHuaweiEntry *entry, const char *v, int strlen);
+float exif_get_float(const unsigned char *buf, ExifByteOrder order);
+void exif_set_float(unsigned char *buf, ExifByteOrder order, float value);
 
 MnoteHuaweiEntry *mnote_huawei_entry_new(ExifMnoteData *n);
 void mnote_huawei_entry_replace_mem(MnoteHuaweiEntry *e, ExifMem *mem);

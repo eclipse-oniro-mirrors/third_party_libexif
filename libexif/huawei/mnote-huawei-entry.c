@@ -360,7 +360,7 @@ mnote_huawei_entry_rational_timestamp_process(char *buff, const int buff_size, c
 			goto FINISH;
 		}
 		unsigned long denominator = 0;
-		if (parse_rational_timestamp(timestamp_char + TIMESTAMP_LENGTH,
+		if (strlen > TIMESTAMP_LENGTH && parse_rational_timestamp(timestamp_char + TIMESTAMP_LENGTH,
 			timestamp_buff, sizeof(timestamp_buff), &denominator) < 0) {
 			ret = -1;
 			goto FINISH;

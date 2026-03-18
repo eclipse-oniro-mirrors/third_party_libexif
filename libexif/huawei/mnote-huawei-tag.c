@@ -119,6 +119,22 @@ static const MnoteHuaweiTable huawei_scene_table[] = {
 	{0, "HwUnknow", N_("Unknow Tag"), "UnknowTag"},
 };
 
+static const MnoteHuaweiTable huawei_fb_face_table[] = {
+	{MNOTE_HUAWEI_FACE_BEAUTY_VERSION, "HwMnoteFaceBeautyVersion", N_("Face beauty Version"), "FaceBeautyVersion"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_IS_FACEDETECTED, "HwMnoteFaceBeautyIsDetected",
+		N_("Face beauty Is Facedetected"), "FaceBeautyIsFaceDetected"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_FACE_NUM, "HwMnoteFaceBeautyFaceNum", N_("Face beauty Face Num"), "FaceBeautyFaceNum"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_FACE_INFO, "HwMnoteFaceBeautyFaceInfo", N_("Face beauty Face Info"), "FaceBeautyFaceInfo"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_FACE_BLUR_INFO, "HwMnoteFaceBeautyFaceBlurInfo",
+		N_("Face beauty Face Blur Info"), "FaceBeautyFaceBlurInfo"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_LUX, "HwMnoteFaceBeautyLux", N_("Face beauty Lux"), "FaceBeautyLux"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_EXPO_TIME, "HwMnoteFaceBeautyExposureTime",
+		N_("Face beauty Expo Time"), "FaceBeautyExpoTime"},
+	{MNOTE_HUAWEI_FACE_BEAUTY_ISO, "HwMnoteFaceBeautyISO", N_("Face beauty Iso"), "FaceBeautyIso"},
+
+	{0, "HwUnknow", N_("Unknow Tag"), "UnknowTag"},
+};
+
 #define GET_TAG_INFO(tb, tb_size, tag, idx, ret) do {	\
 									for (int i = 0; i<tb_size; i++) { \
 										if (tb[i].tag == tag) {ret = tb[i].idx; return ret;}\
@@ -128,6 +144,7 @@ static const MnoteHuaweiTable huawei_scene_table[] = {
 
 const int HUAWEI_TABLE = 9;
 const int HUAWEI_FACE_TABLE = 8;
+const int HUAWEI_FB_FACE_TABLE = 10;
 
 const MnoteHuaweiTable* get_tag_table(MnoteHuaweiTag tag, int* size)
 {
@@ -141,27 +158,18 @@ const MnoteHuaweiTable* get_tag_table(MnoteHuaweiTag tag, int* size)
 		return huawei_face_table;
 	}
 
+	if ((tag >> HUAWEI_FB_FACE_TABLE) & 1) {
+		*size = sizeof (huawei_fb_face_table) / sizeof (huawei_fb_face_table[0]);
+		return huawei_fb_face_table;
+	}
+
 	*size = sizeof (huawei_scene_table) / sizeof (huawei_scene_table[0]);
 	return huawei_scene_table;
 }
 
 MnoteHuaweiTag get_tag_owner_tag(MnoteHuaweiTag tag)
 {
-	MnoteHuaweiTag owner_tag = MNOTE_HUAWEI_INFO;
-	do {
-		if (((tag >> HUAWEI_TABLE) & 1) ||
-			(tag == MNOTE_HUAWEI_FACE_INFO) ||
-			(tag == MNOTE_HUAWEI_SCENE_INFO))
-			break;
-
-		if ((tag >> HUAWEI_FACE_TABLE) & 1) {
-			owner_tag = MNOTE_HUAWEI_FACE_INFO;
-			break;
-		}
-
-		owner_tag = MNOTE_HUAWEI_SCENE_INFO;
-	} while(0);
-	return owner_tag;
+	return MNOTE_HUAWEI_INFO;
 }
 
 int is_ifd_tag(MnoteHuaweiTag tag)
@@ -198,6 +206,14 @@ MnoteHuaweiTag mnote_huawei_tag_from_name(const char *name)
 	for (i = 0; i < size; i++) {
 		if (!strcmp(huawei_scene_table[i].name, name)) {
 			hw_tag = huawei_scene_table[i].tag;
+			goto End;
+		}
+	}
+
+	size = sizeof (huawei_fb_face_table) / sizeof (huawei_fb_face_table[0]) - 1;
+	for (i = 0; i < size; i++) {
+		if (!strcmp(huawei_fb_face_table[i].name, name)) {
+			hw_tag = huawei_fb_face_table[i].tag;
 			goto End;
 		}
 	}

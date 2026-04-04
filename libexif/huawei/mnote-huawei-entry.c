@@ -773,6 +773,7 @@ static const HuaweiTagInitInfo huawei_tag_init_table[] = {
 	{ MNOTE_HUAWEI_FACE_BEAUTY_LUX, EXIF_FORMAT_SLONG, 1, NULL, 0 },
 	{ MNOTE_HUAWEI_FACE_BEAUTY_EXPO_TIME, EXIF_FORMAT_SLONG, 1, NULL, 0 },
 	{ MNOTE_HUAWEI_FACE_BEAUTY_ISO, EXIF_FORMAT_SLONG, 1, NULL, 0 },
+	{ MNOTE_HUAWEI_WATERMARK_INFO, EXIF_FORMAT_ASCII, sizeof("[None]"), "[None]", 0 },
 };
 
 void mnote_huawei_entry_initialize(MnoteHuaweiEntry *e, MnoteHuaweiTag tag, ExifByteOrder order)

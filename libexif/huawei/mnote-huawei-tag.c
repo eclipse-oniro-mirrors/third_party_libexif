@@ -84,6 +84,8 @@ static const MnoteHuaweiTable huawei_table[] = {
 	N_("Orientation Pitch"), "OrientationPitch"},
 	{MNOTE_HUAWEI_ORIENTATION_YAW, "HwMnoteOrientationYaw",
 	N_("Orientation Yaw"), "OrientationYaw"},
+	{MNOTE_HUAWEI_WATERMARK_INFO, "HwMnoteWatermarkInfo",
+	N_("Watermark Info"), "WatermarkInfo"},
 	
 	{0, "HwUnknow", N_("Unknow Tag"), "UnknowTag"},
 };

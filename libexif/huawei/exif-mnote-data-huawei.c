@@ -391,6 +391,7 @@ exif_mnote_data_huawei_load_data (ExifMnoteData *ne, const unsigned char *buf, u
 
 	size_t tcount = 0;
 	size_t offset = 2;
+    size_t total_size = 0;
 
 	for (int i = 0; i < count; i++, offset += 12) {
 		if (CHECKOVERFLOW(current_offset + offset, buf_size, 12)) {
@@ -409,6 +410,8 @@ exif_mnote_data_huawei_load_data (ExifMnoteData *ne, const unsigned char *buf, u
 		size_t components_size = calc_components_size (ne, entries[tcount].format,
 								entries[tcount].components);
 		if (!components_size) continue;
+        total_size += components_size;
+        if (total_size > buf_size) continue;
 
 		entries[tcount].size = components_size;
 

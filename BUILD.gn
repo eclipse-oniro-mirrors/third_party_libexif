@@ -151,6 +151,13 @@ if (defined(ohos_lite)) {  # is on lite Os for ipcamera
 
   ohos_shared_library("libexif") {
     branch_protector_ret = "pac_ret"
+    sanitize = {
+      cfi = true
+      cfi_cross_dso = true
+      cfi_vcall_icall_only = true
+      debug = false
+    }
+    version_script = "libexif.versionscript"
     deps = [ ":exif_static" ]
     if (is_arkui_x) {
       deps += [ "//third_party/bounds_checking_function:libsec_static" ]
